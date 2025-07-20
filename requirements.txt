@@ -1,0 +1,30 @@
+# MCP SDK
+mcp>=1.0.0
+
+# FastAPI and server dependencies
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# HTTP client for MCP client communication
+aiohttp>=3.9.0
+
+# Azure OpenAI
+openai>=1.35.0
+
+# PDF processing with PyMuPDF (fitz)
+PyMuPDF>=1.23.0
+
+# Image processing
+Pillow>=10.0.0
+
+# Additional utilities
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+
+# File handling and text processing
+pathlib2>=2.3.7
+
+# JSON handling (built-in, but ensuring compatibility)
+# Optional: Enhanced text processing
+regex>=2023.10.0
