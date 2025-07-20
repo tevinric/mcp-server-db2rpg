@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: db2-rpg-mcp-server
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+      - ./documents:/app/documents  # Optional: for pre-loading documents
+    environment:
+      - MCP_SERVER_HOST=0.0.0.0
+      - MCP_SERVER_PORT=8000
+      - STORAGE_PATH=/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mcp-network
+    restart: unless-stopped
+
+  # Optional: Redis for caching (if needed for larger deployments)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: mcp-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - mcp-network
+  #   restart: unless-stopped
+
+  # Optional: PostgreSQL for metadata storage (if needed)
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: mcp-postgres
+  #   environment:
+  #     - POSTGRES_DB=mcp_db
+  #     - POSTGRES_USER=mcp_user
+  #     - POSTGRES_PASSWORD=mcp_password
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - mcp-network
+  #   restart: unless-stopped
+
+networks:
+  mcp-network:
+    driver: bridge
+
+volumes:
+  # Persistent storage for documents and artifacts
+  storage_data:
+    driver: local
+  
+  # Optional volumes for additional services
+  # redis_data:
+  #   driver: local
+  # postgres_data:
+  #   driver: local
