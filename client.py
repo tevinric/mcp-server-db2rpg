@@ -89,8 +89,8 @@ class MCPClient:
         async with self.session.get(f"{self.base_url}/artifacts") as response:
             return await response.json()
 
-class CodeGenerationClient:
-    """Azure OpenAI client with MCP tools for code generation."""
+class RPGConversionClient:
+    """Specialized client for RPG conversion workflows."""
     
     def __init__(self, mcp_client: MCPClient):
         self.mcp_client = mcp_client
@@ -138,8 +138,55 @@ class CodeGenerationClient:
         truncated = content[:int(target_chars)]
         return truncated + "\n\n[Content truncated due to length limitations...]"
     
+    async def analyze_traditional_rpg(self, code: str) -> str:
+        """Analyze traditional RPG code structure."""
+        return await self.mcp_client.call_tool("analyze_rpg_syntax", {
+            "code": code,
+            "include_conversion_plan": True
+        })
+    
+    async def convert_rpg_code(self, code: str, apply_standards: bool = True) -> str:
+        """Convert traditional RPG to free-form with standards application."""
+        return await self.mcp_client.call_tool("convert_rpg_to_freeform", {
+            "code": code,
+            "apply_standards": apply_standards,
+            "include_comments": True,
+            "validation_level": "detailed"
+        })
+    
+    async def validate_conversion(self, original_code: str, converted_code: str) -> str:
+        """Validate converted code against standards."""
+        return await self.mcp_client.call_tool("validate_conversion", {
+            "original_code": original_code,
+            "converted_code": converted_code
+        })
+    
+    async def get_conversion_standards(self) -> str:
+        """Extract RPG conversion patterns from uploaded standards."""
+        return await self.mcp_client.call_tool("extract_rpg_patterns", {
+            "pattern_type": "conversion_rules",
+            "format": "both"
+        })
+    
+    async def suggest_modernization(self, code: str, focus_areas: List[str] = None) -> str:
+        """Get modernization suggestions for RPG code."""
+        if focus_areas is None:
+            focus_areas = ["error_handling", "procedures", "maintainability"]
+        
+        return await self.mcp_client.call_tool("suggest_modernization", {
+            "code": code,
+            "focus_areas": focus_areas
+        })
+    
+    async def compare_code_styles(self, operation_type: str) -> str:
+        """Compare traditional vs free-form coding styles."""
+        return await self.mcp_client.call_tool("compare_code_styles", {
+            "operation_type": operation_type,
+            "show_examples": True
+        })
+    
     async def chat_completion(self, messages: List[Dict[str, str]], max_tool_calls: int = 10) -> str:
-        """Chat completion with MCP tool support."""
+        """Chat completion with MCP tool support for RPG conversion."""
         
         # Get available tools
         tools = await self.get_available_tools()
@@ -225,98 +272,8 @@ class CodeGenerationClient:
         
         return "Maximum tool calls reached"
 
-    async def generate_code(self, requirements: str, code_type: str = "sql") -> str:
-        """Generate code based on requirements."""
-        system_prompt = f"""You are a specialist in IBM DB2 and RPG code generation. 
-        
-        Your task is to generate high-quality, production-ready {code_type.upper()} code based on the user's requirements.
-        
-        IMPORTANT GUIDELINES:
-        1. Always search for relevant reference documents first using search_references
-        2. Extract relevant code examples using extract_code_examples 
-        3. Follow the coding standards and best practices from uploaded documents
-        4. Generate clean, well-commented, and maintainable code
-        5. Include error handling where appropriate
-        6. If the code is large, use create_artifact to manage content
-        
-        Always prioritize information from uploaded reference documents over general knowledge."""
-        
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Generate {code_type} code for: {requirements}"}
-        ]
-        
-        return await self.chat_completion(messages)
-    
-    async def review_code(self, code: str, code_type: str = "sql") -> str:
-        """Review code against standards."""
-        system_prompt = f"""You are a code reviewer specializing in IBM DB2 and RPG code.
-        
-        Your task is to review the provided code against company standards and best practices.
-        
-        REVIEW PROCESS:
-        1. Use search_references to find relevant coding standards
-        2. Use review_code tool to analyze the code
-        3. Provide detailed feedback on:
-           - Code quality and adherence to standards
-           - Performance considerations
-           - Security issues
-           - Maintainability
-           - Best practice compliance
-        
-        Always reference specific standards from uploaded documents."""
-        
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Please review this {code_type} code:\n\n```{code_type}\n{code}\n```"}
-        ]
-        
-        return await self.chat_completion(messages)
-    
-    async def explain_code(self, code: str, level: str = "intermediate") -> str:
-        """Explain code functionality."""
-        system_prompt = f"""You are a technical instructor specializing in IBM DB2 and RPG.
-        
-        Your task is to explain the provided code in a clear and educational manner.
-        
-        EXPLANATION PROCESS:
-        1. Use explain_code tool to analyze the code
-        2. Search for relevant documentation using search_references
-        3. Provide explanations at the {level} level
-        4. Include references to official documentation when available
-        
-        Make explanations clear, accurate, and educational."""
-        
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Please explain this code at {level} level:\n\n```\n{code}\n```"}
-        ]
-        
-        return await self.chat_completion(messages)
-    
-    async def create_large_artifact(self, artifact_type: str, specifications: str) -> str:
-        """Create large code artifacts."""
-        system_prompt = """You are a senior developer creating comprehensive code artifacts.
-        
-        Your task is to create large, well-structured code artifacts like complete modules or programs.
-        
-        ARTIFACT CREATION PROCESS:
-        1. Search for relevant standards and examples
-        2. Use create_artifact tool for large code generation
-        3. Ensure proper structure and documentation
-        4. Follow company coding standards
-        
-        Create production-ready, comprehensive code artifacts."""
-        
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Create a {artifact_type} with these specifications: {specifications}"}
-        ]
-        
-        return await self.chat_completion(messages)
-
-async def interactive_code_session():
-    """Interactive code generation and review session."""
+async def interactive_rpg_conversion_session():
+    """Interactive RPG conversion and analysis session."""
     
     # Check required environment variables
     required_vars = [
@@ -332,16 +289,20 @@ async def interactive_code_session():
         return
     
     async with MCPClient() as mcp_client:
-        code_client = CodeGenerationClient(mcp_client)
+        rpg_client = RPGConversionClient(mcp_client)
         
-        print("🚀 DB2/RPG Code Generation Assistant")
-        print("=" * 50)
-        print("Commands:")
+        print("🔄 RPG Traditional-to-Freeform Conversion Assistant")
+        print("=" * 60)
+        print("Enhanced Commands:")
         print("  'upload <file_path>' - Upload reference document")
-        print("  'generate <type> <requirements>' - Generate code")
-        print("  'review <type> <code>' - Review code")
-        print("  'explain <code>' - Explain code")
-        print("  'artifact <type> <specs>' - Create large artifact")
+        print("  'analyze <code>' - Analyze traditional RPG code")
+        print("  'convert <code>' - Convert traditional RPG to free-form")
+        print("  'validate' - Validate a conversion (enter both codes)")
+        print("  'standards' - View conversion standards from documents")
+        print("  'modernize <code>' - Get modernization suggestions")
+        print("  'compare <operation>' - Compare coding styles")
+        print("  'patterns <type>' - Extract specific RPG patterns")
+        print("  'sections <title>' - Get document sections")
         print("  'docs' - List uploaded documents")
         print("  'artifacts' - List generated artifacts")
         print("  'help' - Show this help")
@@ -350,31 +311,39 @@ async def interactive_code_session():
         
         # Check server connection
         try:
-            tools = await code_client.get_available_tools()
-            print(f"✅ Connected to MCP server. Available tools: {len(tools)}")
+            tools = await rpg_client.get_available_tools()
+            print(f"✅ Connected to enhanced MCP server. Available tools: {len(tools)}")
+            
+            # Show RPG-specific tools
+            rpg_tools = [tool for tool in tools if 'rpg' in tool['function']['name'].lower() or 'convert' in tool['function']['name'].lower()]
+            print(f"🔧 RPG conversion tools available: {len(rpg_tools)}")
+            for tool in rpg_tools:
+                print(f"   - {tool['function']['name']}")
         except Exception as e:
             print(f"❌ Cannot connect to MCP server: {e}")
-            print("Make sure the server is running: python mcp-server.py")
+            print("Make sure the enhanced server is running: python mcp-server.py")
             return
         
         print()
         
         while True:
             try:
-                user_input = input("Code Assistant> ").strip()
+                user_input = input("RPG Assistant> ").strip()
                 
                 if user_input.lower() in ['quit', 'exit', 'q']:
                     break
                 
                 elif user_input.lower() == 'help':
-                    print("Available commands:")
-                    print("  upload - Upload reference documents (PDF/Markdown)")
-                    print("  generate - Generate new code based on requirements")
-                    print("  review - Review existing code against standards")
-                    print("  explain - Get explanations of code functionality")
-                    print("  artifact - Create large code artifacts")
-                    print("  docs - List all uploaded reference documents")
-                    print("  artifacts - List all generated artifacts")
+                    print("RPG Conversion Commands:")
+                    print("  upload - Upload RPG standards and conversion guides")
+                    print("  analyze - Analyze traditional RPG code structure")
+                    print("  convert - Convert traditional RPG to free-form")
+                    print("  validate - Validate conversion results")
+                    print("  standards - View conversion rules from documents")
+                    print("  modernize - Get modernization suggestions")
+                    print("  compare - Compare traditional vs free-form styles")
+                    print("  patterns - Extract RPG patterns from documents")
+                    print("  sections - Get specific document sections")
                     continue
                 
                 elif user_input.lower() == 'docs':
@@ -390,6 +359,12 @@ async def interactive_code_session():
                     print(f"📁 Artifacts: {artifacts.get('total_artifacts', 0)}")
                     for artifact in artifacts.get('artifacts', []):
                         print(f"  - {artifact['filename']} ({artifact['size']} bytes)")
+                    continue
+                
+                elif user_input.lower() == 'standards':
+                    print("📋 Extracting conversion standards from documents...")
+                    result = await rpg_client.get_conversion_standards()
+                    print(f"Conversion Standards:\n{result}\n")
                     continue
                 
                 elif user_input.startswith('upload '):
@@ -408,7 +383,7 @@ async def interactive_code_session():
                         
                         # Process the document
                         filename = os.path.basename(file_path)
-                        doc_type = input("Document type (standards/procedures/best_practices/reference/examples): ") or "reference"
+                        doc_type = input("Document type (standards/conversion_guide/best_practices/reference/examples): ") or "reference"
                         description = input("Description (optional): ") or f"Uploaded {filename}"
                         
                         process_result = await mcp_client.call_tool("upload_document", {
@@ -420,28 +395,8 @@ async def interactive_code_session():
                     
                     continue
                 
-                elif user_input.startswith('generate '):
-                    parts = user_input[9:].split(' ', 1)
-                    if len(parts) < 2:
-                        print("Usage: generate <type> <requirements>")
-                        print("Types: sql, db2, rpg, procedure")
-                        continue
-                    
-                    code_type, requirements = parts
-                    print(f"🔧 Generating {code_type} code...")
-                    
-                    response = await code_client.generate_code(requirements, code_type)
-                    print(f"Generated Code:\n{response}\n")
-                    continue
-                
-                elif user_input.startswith('review '):
-                    parts = user_input[7:].split(' ', 1)
-                    if len(parts) < 2:
-                        print("Usage: review <type> <code>")
-                        continue
-                    
-                    code_type = parts[0]
-                    print("Enter your code (end with '###' on a new line):")
+                elif user_input.startswith('analyze '):
+                    print("Enter your traditional RPG code (end with '###' on a new line):")
                     code_lines = []
                     while True:
                         line = input()
@@ -450,14 +405,14 @@ async def interactive_code_session():
                         code_lines.append(line)
                     
                     code = '\n'.join(code_lines)
-                    print(f"🔍 Reviewing {code_type} code...")
+                    print("🔍 Analyzing traditional RPG code...")
                     
-                    response = await code_client.review_code(code, code_type)
-                    print(f"Review Results:\n{response}\n")
+                    result = await rpg_client.analyze_traditional_rpg(code)
+                    print(f"Analysis Results:\n{result}\n")
                     continue
                 
-                elif user_input.startswith('explain '):
-                    print("Enter your code (end with '###' on a new line):")
+                elif user_input.startswith('convert '):
+                    print("Enter your traditional RPG code (end with '###' on a new line):")
                     code_lines = []
                     while True:
                         line = input()
@@ -466,55 +421,138 @@ async def interactive_code_session():
                         code_lines.append(line)
                     
                     code = '\n'.join(code_lines)
-                    level = input("Explanation level (beginner/intermediate/advanced): ") or "intermediate"
+                    apply_standards = input("Apply uploaded coding standards? (y/n): ").lower() != 'n'
                     
-                    print(f"📖 Explaining code at {level} level...")
+                    print("🔄 Converting to free-form RPG...")
                     
-                    response = await code_client.explain_code(code, level)
-                    print(f"Code Explanation:\n{response}\n")
+                    result = await rpg_client.convert_rpg_code(code, apply_standards)
+                    print(f"Conversion Results:\n{result}\n")
                     continue
                 
-                elif user_input.startswith('artifact '):
-                    parts = user_input[9:].split(' ', 1)
-                    if len(parts) < 2:
-                        print("Usage: artifact <type> <specifications>")
-                        print("Types: module, procedure, package, complete_program")
-                        continue
+                elif user_input.lower() == 'validate':
+                    print("Enter original traditional RPG code (end with '###' on a new line):")
+                    original_lines = []
+                    while True:
+                        line = input()
+                        if line.strip() == '###':
+                            break
+                        original_lines.append(line)
                     
-                    artifact_type, specifications = parts
-                    print(f"🏗️ Creating {artifact_type} artifact...")
+                    print("Enter converted free-form RPG code (end with '###' on a new line):")
+                    converted_lines = []
+                    while True:
+                        line = input()
+                        if line.strip() == '###':
+                            break
+                        converted_lines.append(line)
                     
-                    response = await code_client.create_large_artifact(artifact_type, specifications)
-                    print(f"Artifact Created:\n{response}\n")
+                    original_code = '\n'.join(original_lines)
+                    converted_code = '\n'.join(converted_lines)
+                    
+                    print("🔍 Validating conversion...")
+                    
+                    result = await rpg_client.validate_conversion(original_code, converted_code)
+                    print(f"Validation Results:\n{result}\n")
+                    continue
+                
+                elif user_input.startswith('modernize '):
+                    print("Enter your RPG code (end with '###' on a new line):")
+                    code_lines = []
+                    while True:
+                        line = input()
+                        if line.strip() == '###':
+                            break
+                        code_lines.append(line)
+                    
+                    code = '\n'.join(code_lines)
+                    focus_areas = input("Focus areas (comma-separated): error_handling,procedures,maintainability,sql_integration: ").split(',')
+                    focus_areas = [area.strip() for area in focus_areas if area.strip()]
+                    
+                    if not focus_areas:
+                        focus_areas = ["error_handling", "procedures", "maintainability"]
+                    
+                    print("💡 Generating modernization suggestions...")
+                    
+                    result = await rpg_client.suggest_modernization(code, focus_areas)
+                    print(f"Modernization Suggestions:\n{result}\n")
+                    continue
+                
+                elif user_input.startswith('compare '):
+                    operation_type = user_input[8:].strip()
+                    if not operation_type:
+                        print("Available operations: file_operations, calculations, conditions, loops, procedures, error_handling")
+                        operation_type = input("Enter operation type: ").strip()
+                    
+                    print(f"📊 Comparing {operation_type} styles...")
+                    
+                    result = await rpg_client.compare_code_styles(operation_type)
+                    print(f"Style Comparison:\n{result}\n")
+                    continue
+                
+                elif user_input.startswith('patterns '):
+                    pattern_type = user_input[9:].strip()
+                    if not pattern_type:
+                        print("Available patterns: naming_conventions, error_handling, file_operations, data_structures, procedures, conversion_rules")
+                        pattern_type = input("Enter pattern type: ").strip()
+                    
+                    print(f"🔍 Extracting {pattern_type} patterns...")
+                    
+                    result = await mcp_client.call_tool("extract_rpg_patterns", {
+                        "pattern_type": pattern_type,
+                        "format": "both"
+                    })
+                    print(f"RPG Patterns:\n{result}\n")
+                    continue
+                
+                elif user_input.startswith('sections '):
+                    section_title = user_input[9:].strip()
+                    if not section_title:
+                        section_title = input("Enter section title to search for: ").strip()
+                    
+                    print(f"📖 Searching for section '{section_title}'...")
+                    
+                    result = await mcp_client.call_tool("get_document_sections", {
+                        "section_title": section_title
+                    })
+                    print(f"Document Sections:\n{result}\n")
                     continue
                 
                 elif user_input:
-                    # General conversation
-                    system_msg = """You are a DB2/RPG coding assistant. Help with code-related questions, 
-                    reference uploaded documents when possible, and provide accurate technical guidance."""
+                    # General RPG conversation with AI
+                    system_msg = """You are an expert RPG developer specializing in traditional to free-form conversions. 
                     
-                    response = await code_client.chat_completion([
+                    Your expertise includes:
+                    - Analyzing traditional fixed-format RPG code
+                    - Converting to modern free-form RPG
+                    - Applying coding standards from uploaded documents
+                    - Suggesting modernization techniques
+                    - Validating conversions
+                    
+                    Always reference uploaded coding standards and use the available tools to provide accurate, 
+                    standards-compliant advice for RPG development and conversion projects."""
+                    
+                    response = await rpg_client.chat_completion([
                         {"role": "system", "content": system_msg},
                         {"role": "user", "content": user_input}
                     ])
-                    print(f"Assistant: {response}\n")
+                    print(f"RPG Expert: {response}\n")
                     
             except KeyboardInterrupt:
                 break
             except Exception as e:
                 print(f"Error: {e}\n")
         
-        print("👋 Goodbye!")
+        print("👋 Thanks for using the RPG Conversion Assistant!")
 
 async def main():
     """Main function for command line usage."""
     import sys
     
     if len(sys.argv) > 1 and sys.argv[1] == "interactive":
-        await interactive_code_session()
+        await interactive_rpg_conversion_session()
     else:
         # Run example usage
-        print("🚀 DB2/RPG Code Generation Client")
+        print("🔄 Enhanced RPG Conversion Client")
         print("=" * 40)
         
         # Check environment
@@ -531,29 +569,40 @@ async def main():
             return
         
         async with MCPClient() as mcp_client:
-            code_client = CodeGenerationClient(mcp_client)
+            rpg_client = RPGConversionClient(mcp_client)
             
             # Test connection
             try:
-                tools = await code_client.get_available_tools()
-                print(f"✅ Connected to MCP server. Available tools: {len(tools)}")
+                tools = await rpg_client.get_available_tools()
+                print(f"✅ Connected to enhanced MCP server. Available tools: {len(tools)}")
                 
-                # List available tools
-                print("\n📚 Available Tools:")
-                for tool in tools:
+                # List RPG-specific tools
+                print("\n🔧 RPG Conversion Tools:")
+                rpg_tools = [tool for tool in tools if any(keyword in tool['function']['name'].lower() 
+                           for keyword in ['rpg', 'convert', 'analyze', 'modernize', 'validate'])]
+                
+                for tool in rpg_tools:
                     print(f"  - {tool['function']['name']}: {tool['function']['description']}")
                 
-                # Example usage
-                print("\n🔧 Example: Generate SQL code")
-                requirements = "Create a SELECT statement to get customer information with order history"
-                response = await code_client.generate_code(requirements, "sql")
-                print(f"Generated Code:\n{response}")
+                # Example: Analyze some traditional RPG code
+                print("\n📝 Example: Analyzing traditional RPG code")
+                sample_rpg = """H DFTACTGRP(*NO) ACTGRP(*CALLER)
+F CUSTFILE  IF   E           K DISK
+D customerID      S              7P 0
+D customerName    S             50A
+C                   CHAIN     12345         CUSTFILE
+C                   IF        %FOUND(CUSTFILE)
+C                   EVAL      customerName = CFNAME
+C                   ENDIF"""
                 
-                print("\n💡 For interactive mode, run: python client.py interactive")
+                analysis_result = await rpg_client.analyze_traditional_rpg(sample_rpg)
+                print(f"Analysis Result:\n{analysis_result}")
+                
+                print("\n💡 For interactive RPG conversion mode, run: python client.py interactive")
                 
             except Exception as e:
                 print(f"❌ Cannot connect to MCP server: {e}")
-                print("Make sure the server is running: python mcp-server.py")
+                print("Make sure the enhanced server is running: python mcp-server.py")
 
 if __name__ == "__main__":
     asyncio.run(main())

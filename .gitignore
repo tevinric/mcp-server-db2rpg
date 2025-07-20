@@ -1,0 +1,4 @@
+.env
+.env_var_init_client_dev.sh
+/.venv
+env_var_init_client_dev.sh
